@@ -35,7 +35,10 @@ async function resolveUpdater() {
 
   const updateData = {
     name: tag.name,
+    version: tag.name.replace("v", ""),
+    tag_name: tag.name,
     notes: await resolveUpdateLog(tag.name), // use updatelog.md
+    body: await resolveUpdateLog(tag.name), // 添加body字段（v1可能使用此字段）
     pub_date: new Date().toISOString(),
     platforms: {
       win64: { signature: "", url: "" }, // compatible with older formats
@@ -164,9 +167,10 @@ async function resolveUpdater() {
   console.log(updateData);
 
   // maybe should test the signature as well
-  // delete the null field
+  // delete the null field for new format platforms only, keep v1 format platforms
+  const v1Platforms = ["win64", "linux", "darwin"]; // v1 格式的平台标识符
   Object.entries(updateData.platforms).forEach(([key, value]) => {
-    if (!value.url) {
+    if (!value.url && !v1Platforms.includes(key)) {
       console.log(`[Error]: failed to parse release for "${key}"`);
       delete updateData.platforms[key];
     }
@@ -175,6 +179,13 @@ async function resolveUpdater() {
   // 生成一个代理github的更新文件
   // 使用 https://hub.fastgit.xyz/ 做github资源的加速
   const updateDataNew = JSON.parse(JSON.stringify(updateData));
+
+  // 确保所有关键字段都存在
+  ["version", "tag_name", "body"].forEach((field) => {
+    if (updateData[field] && !updateDataNew[field]) {
+      updateDataNew[field] = updateData[field];
+    }
+  });
 
   Object.entries(updateDataNew.platforms).forEach(([key, value]) => {
     if (value.url) {
